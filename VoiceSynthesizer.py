@@ -11,7 +11,7 @@ np.random.seed(0)
 
 import nltk
 nltk.download('punkt')
-from StyleTTS2Synth.Modules.diffusion import sampler
+from Modules.diffusion import sampler
 # load packages
 import time
 import random
@@ -27,12 +27,9 @@ from nltk.tokenize import word_tokenize
 
 from StyleTTS2Synth.models import *
 from StyleTTS2Synth.utils import *
-from StyleTTS2Synth.text_utils import TextCleaner
+from text_utils import TextCleaner
 import phonemizer
 import os
-from StyleTTS2Synth.Utils.PLBERT.util import load_plbert
-
-import site
 
 class StyleTTS2Synthesizer():
 
@@ -51,25 +48,24 @@ class StyleTTS2Synthesizer():
         config = yaml.safe_load(open(os.path.join(styletts2_model_path, "Models/LJSpeech/config.yml")))
 
         # load pretrained ASR model
-        ASR_config = os.path.join(styletts2_model_path,config.get('ASR_config', False))
-        print(ASR_config)
-        ASR_path = os.path.join(styletts2_model_path,config.get('ASR_path', False))
-        print(ASR_path)
+        ASR_config = config.get('ASR_config', False)
+        ASR_path = config.get('ASR_path', False)
         text_aligner = load_ASR_models(ASR_path, ASR_config)
 
         # load pretrained F0 model
-        F0_path = os.path.join(styletts2_model_path,config.get('F0_path', False))
+        F0_path = config.get('F0_path', False)
         pitch_extractor = load_F0_models(F0_path)
 
         # load BERT model
-        BERT_path = os.path.join(styletts2_model_path, config.get('PLBERT_dir', False))
+        from Utils.PLBERT.util import load_plbert
+        BERT_path = config.get('PLBERT_dir', False)
         plbert = load_plbert(BERT_path)
 
         self.model = build_model(recursive_munch(config['model_params']), text_aligner, pitch_extractor, plbert)
         _ = [self.model[key].eval() for key in self.model]
         _ = [self.model[key].to(self.device) for key in self.model]
 
-        params_whole = torch.load(os.path.join(styletts2_model_path, "Models/LJSpeech/epoch_2nd_00100.pth"), map_location='cpu')
+        params_whole = torch.load("Models/LJSpeech/epoch_2nd_00100.pth", map_location='cpu')
         params = params_whole['net']
 
         for key in self.model:
@@ -97,7 +93,7 @@ class StyleTTS2Synthesizer():
                     clamp=False
                 )
         
-        params_whole = torch.load(os.path.join(styletts2_model_path, "Models/LJSpeech/epoch_2nd_00100.pth"), map_location='cpu')
+        params_whole = torch.load("Models/LJSpeech/epoch_2nd_00100.pth", map_location='cpu')
         self.params = params_whole['net']
 
 
@@ -134,8 +130,6 @@ class StyleTTS2Synthesizer():
         text = text.strip()
         text = text.replace('"', '')
         ps = self.global_phonemizer.phonemize([text])
-        print(f'phonemized text :{ps}')
-
         ps = word_tokenize(ps[0])
         ps = ' '.join(ps)
 
@@ -178,14 +172,13 @@ class StyleTTS2Synthesizer():
             F0_pred, N_pred = self.model.predictor.F0Ntrain(en, s)
             out = self.model.decoder((t_en @ pred_aln_trg.unsqueeze(0).to(self.device)),
                                     F0_pred, N_pred, ref.squeeze().unsqueeze(0))
-            print('output generated')
+
         return out.squeeze().cpu().numpy()
 
     def LFinference(self, text, s_prev, noise, alpha=0.7, diffusion_steps=5, embedding_scale=1):
         text = text.strip()
         text = text.replace('"', '')
         ps = self.global_phonemizer.phonemize([text])
-        print(f'phonemized text :{ps}')
         ps = word_tokenize(ps[0])
         ps = ' '.join(ps)
 
