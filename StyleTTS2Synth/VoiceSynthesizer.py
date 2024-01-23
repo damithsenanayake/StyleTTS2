@@ -201,7 +201,7 @@ class StyleTTS2Synthesizer():
             bert_dur = self.model.bert(tokens, attention_mask=(~text_mask).int())
             d_en = self.model.bert_encoder(bert_dur).transpose(-1, -2)
 
-            s_pred = sampler(noise,
+            s_pred = self.sampler(noise,
                     embedding=bert_dur[0].unsqueeze(0), num_steps=diffusion_steps,
                     embedding_scale=embedding_scale).squeeze(0)
 
